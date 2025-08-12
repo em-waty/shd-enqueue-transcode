@@ -1,6 +1,6 @@
 packages:
   - name: default
-    actions:
+    functions:
       - name: enqueue-transcode
         runtime: nodejs:18
         web: true
@@ -8,7 +8,6 @@ packages:
         limits:
           timeout: 60000
         environment:
-          QUEUE_KEY: ${QUEUE_KEY}
-          CORS_ORIGIN: ${CORS_ORIGIN}
-          REDIS_URL: ${REDIS_URL}
-        source: functions/enqueue-transcode.js
+          CORS_ORIGIN: "${CORS_ORIGIN}"
+          ENQUEUE_API_URL: "${ENQUEUE_API_URL}"
+          ENQUEUE_TOKEN: "${ENQUEUE_TOKEN}"

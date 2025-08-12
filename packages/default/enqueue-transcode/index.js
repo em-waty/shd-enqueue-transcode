@@ -1,22 +1,16 @@
-// DigitalOcean Functions (Node 18+) - Web action
-// Purpose: accept POST JSON and enqueue a job for the droplet worker via Redis.
-
-import Redis from "ioredis";
 import { z } from "zod";
-import { randomUUID } from "crypto";
 
 const {
-  REDIS_URL,
-  QUEUE_KEY = "shd:transcode:jobs",
+  ENQUEUE_API_URL,
+  ENQUEUE_TOKEN,
   CORS_ORIGIN = "*",
 } = process.env;
 
-// Validate incoming payload
 const JobSchema = z.object({
-  spaceKey: z.string().min(1),            // e.g. "uploads/2025-08-11_video.mp4"
+  spaceKey: z.string().min(1),
   originalFilename: z.string().optional(),
-  contentType: z.string().optional(),     // e.g. "video/mp4"
-  outFolder: z.string().default("uploads-shd")
+  contentType: z.string().optional(),
+  outFolder: z.string().default("uploads-shd"),
 });
 
 function cors(extra = {}) {
@@ -30,73 +24,45 @@ function cors(extra = {}) {
   };
 }
 
-export async function main(args) {
-  const method = (args.__ow_method || "GET").toUpperCase();
+export async function main(args = {}) {
+  const method = ((args.__ow_method ?? "GET") + "").toUpperCase();
+  if (method === "OPTIONS") return { statusCode: 204, headers: cors(), body: "" };
+  if (method === "GET") return { statusCode: 200, headers: cors(), body: JSON.stringify({ ok: true, service: "enqueue-transcode", time: new Date().toISOString() }) };
+  if (method !== "POST") return { statusCode: 405, headers: cors(), body: JSON.stringify({ ok: false, error: "Method Not Allowed" }) };
 
-  if (method === "OPTIONS") {
-    return { statusCode: 204, headers: cors(), body: "" };
+  if (!ENQUEUE_API_URL || !ENQUEUE_TOKEN) {
+    return { statusCode: 500, headers: cors(), body: JSON.stringify({ ok: false, error: "Missing ENQUEUE_API_URL or ENQUEUE_TOKEN" }) };
   }
 
-  if (method === "GET") {
-    return {
-      statusCode: 200,
-      headers: cors(),
-      body: JSON.stringify({ ok: true, service: "enqueue-transcode", time: new Date().toISOString() }),
-    };
-  }
-
-  if (method !== "POST") {
-    return { statusCode: 405, headers: cors(), body: JSON.stringify({ ok: false, error: "Method Not Allowed" }) };
-  }
-
-  if (!REDIS_URL) {
-    return { statusCode: 500, headers: cors(), body: JSON.stringify({ ok: false, error: "Missing REDIS_URL env" }) };
-  }
-
-  // Parse body
+  // Parse DO web-action args (query/JSON)
   let json = {};
   try {
-    const raw = args.__ow_body || "";
-    json = raw ? JSON.parse(raw) : {};
+    if (args && typeof args === "object" && !args.__ow_body) {
+      const { __ow_method, __ow_headers, __ow_path, __ow_isBase64, __ow_query, ...rest } = args;
+      json = rest;
+    } else if (args?.__ow_body) {
+      const raw = args.__ow_body;
+      const text = args.__ow_isBase64 ? Buffer.from(raw, "base64").toString("utf8") : raw;
+      json = text ? JSON.parse(text) : {};
+    }
   } catch {
     return { statusCode: 400, headers: cors(), body: JSON.stringify({ ok: false, error: "Invalid JSON body" }) };
   }
 
-  // Validate
   const parsed = JobSchema.safeParse(json);
   if (!parsed.success) {
-    return {
-      statusCode: 422,
-      headers: cors(),
-      body: JSON.stringify({ ok: false, error: "Invalid payload", details: parsed.error.flatten() }),
-    };
+    return { statusCode: 422, headers: cors(), body: JSON.stringify({ ok: false, error: "Invalid payload", details: parsed.error.flatten() }) };
   }
 
-  const jobId = randomUUID();
-  const job = {
-    jobId,
-    type: "transcode",
-    createdAt: new Date().toISOString(),
-    ...parsed.data,
-  };
-
-  const redis = new Redis(REDIS_URL, {
-    lazyConnect: true,
-    tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
-  });
-
   try {
-    await redis.connect();
-    await redis.lpush(QUEUE_KEY, JSON.stringify(job));
-    await redis.quit();
-
-    return { statusCode: 201, headers: cors(), body: JSON.stringify({ ok: true, jobId }) };
+    const resp = await fetch(ENQUEUE_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-enqueue-token": ENQUEUE_TOKEN },
+      body: JSON.stringify(parsed.data),
+    });
+    const text = await resp.text(); // pass-through
+    return { statusCode: resp.status, headers: cors(), body: text };
   } catch (err) {
-    try { await redis.quit(); } catch {}
-    return {
-      statusCode: 500,
-      headers: cors(),
-      body: JSON.stringify({ ok: false, error: "Enqueue failed", details: String(err?.message || err) }),
-    };
+    return { statusCode: 502, headers: cors(), body: JSON.stringify({ ok: false, error: "Gateway error", details: String(err?.message || err) }) };
   }
 }
