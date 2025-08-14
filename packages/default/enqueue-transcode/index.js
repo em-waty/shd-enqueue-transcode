@@ -65,4 +65,4 @@ export async function main(args = {}) {
   } catch (err) {
     return { statusCode: 502, headers: cors(), body: JSON.stringify({ ok: false, error: "Gateway error", details: String(err?.message || err) }) };
   }
-}.
+}
