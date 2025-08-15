@@ -5,8 +5,8 @@
     "packageVersions": {},
     "actionVersions": {
       "enqueue-transcode": {
-        "version": "0.0.5",
-        "digest": "004391cdf50d4184ecd26670fa62ba9bc35ef87d9aa2550c0a2e425e8ea7b89b"
+        "version": "0.0.11",
+        "digest": "d96efe7d82a963b8c1d0adad7b78bf54c9feedc8b595764acaa91bf50d798e75"
       }
     }
   }
