@@ -1,4 +1,4 @@
-// packages/default/enqueue-transcode/index.js
+// packages/default/shd-enqueue-transcode/index.js
 import { z } from "zod";
 import Redis from "ioredis";
 import crypto from "crypto";
