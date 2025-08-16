@@ -1,6 +1,10 @@
 packages:
-  default:
-    actions:
-      enqueue-transcode:
+  - name: default
+    functions:
+      - name: shd-enqueue-transcode
         runtime: nodejs:18
         web: true
+        main: main
+        limits:
+          timeout: 60000
+          memory: 512
