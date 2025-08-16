@@ -5,8 +5,8 @@
     "packageVersions": {},
     "actionVersions": {
       "shd-enqueue-transcode": {
-        "version": "0.0.5",
-        "digest": "eae40b6952b8aeaa33a72b6ea9cd59796dda76e394d23def552534ac80e6f1ad"
+        "version": "0.0.9",
+        "digest": "7108c1952c197f0fc959ed5a8ee925fa38afaf99ec0c06ec6a2372b86ea57247"
       }
     }
   }
